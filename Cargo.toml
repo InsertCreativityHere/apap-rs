@@ -1,0 +1,19 @@
+[package]
+name = "archive-fs"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+aes = "0.8.2"
+cipher = "0.4.4"
+ed25519-dalek = "1.0.1"
+p256 = "0.13.2"
+rand = "0.8.5"
+rayon = "1.7.0"
+sha2 = "0.10.6"
+
+# Needed for 'ed25519-dalek' which hasn't been updated to use the latest rand yet.
+rand_old = { package = "rand", version = "0.7.0" }
+zeroize = "1.6.0"
