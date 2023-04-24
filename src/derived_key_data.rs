@@ -1,4 +1,6 @@
 
+use aes::Aes256;
+use cipher::Key;
 use sha2::{Digest, Sha256};
 use rand::Rng;
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -15,7 +17,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 pub struct DerivedKeyData {
     /// The derived key.
     /// This should be kept private, but compromising this derived key doesn't compromise the master key.
-    pub derived_key: [u8; 32],
+    pub derived_key: Key<Aes256>,
 
     /// The salt that was hashed with the master key.
     /// This can be publicized without compromising either the master or derived key.
@@ -26,7 +28,7 @@ impl DerivedKeyData {
     /// Derive a key from the provided master key by hashing it with a randomly generated 64bit salt:
     /// `derived_key = sha256([master_key][key_salt])`
     /// Both keys are/must be 256 bits in length.
-    pub fn derive_new_from(master_key: &[u8; 32]) -> Self {
+    pub fn derive_new_from(master_key: &Key<Aes256>) -> Self {
         // Randomly generate a salt value to hash with the provided key.
         let key_salt: u64 = rand::thread_rng().gen();
 
@@ -38,7 +40,7 @@ impl DerivedKeyData {
     /// Derive a key from the provided master key by hashing it with the specified salt:
     /// `derived_key = sha256([master_key][key_salt])`
     /// Both keys are/must be 256 bits in length.
-    pub fn derive_from(master_key: &[u8; 32], key_salt: u64) -> [u8; 32] {
+    pub fn derive_from(master_key: &Key<Aes256>, key_salt: u64) -> Key<Aes256> {
         // Hash the provided master key with the randomly generated salt.
         let mut key_generator = Sha256::new();
         key_generator.update(master_key);
@@ -50,12 +52,12 @@ impl DerivedKeyData {
 #[cfg(test)]
 mod tests {
     use super::DerivedKeyData;
-    use rand::Rng;
+    use crate::key_gen_utils;
 
     #[test]
     fn ensure_key_derivation_is_deterministic() {
         // ===== Arrange ===== //
-        let test_key: [u8; 32] = rand::thread_rng().gen();
+        let test_key = key_gen_utils::generate_new_encryption_key();
 
         // ===== Act ===== //
         let DerivedKeyData { derived_key, key_salt } = DerivedKeyData::derive_new_from(&test_key);

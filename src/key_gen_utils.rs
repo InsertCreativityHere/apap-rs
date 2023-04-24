@@ -6,7 +6,7 @@ use rand::Rng;
 use rand_old::rngs::OsRng;
 
 /// Generate a new 256bit AES encryption key from the OS's randomness source.
-pub fn generate_new_master_encryption_key() -> Key<Aes256> {
+pub fn generate_new_encryption_key() -> Key<Aes256> {
     // Randomly generate an array of 32 bytes, then convert it into a 256bit key value.
     rand::thread_rng().gen::<[u8; 32]>().into()
 }

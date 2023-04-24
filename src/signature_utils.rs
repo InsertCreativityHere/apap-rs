@@ -1,13 +1,68 @@
 
 use ed25519_dalek::{ExpandedSecretKey, Keypair, Signature, PublicKey};
 
-/// TODO
+/// Signs the message with the provided key pair using an ed25519 signature scheme.
 pub fn sign_message(message: &[u8], signing_keys: &Keypair) -> Signature {
     let expanded_key = ExpandedSecretKey::from(&signing_keys.secret);
     expanded_key.sign(message, &signing_keys.public)
 }
 
-/// TODO
-pub fn verify_signature(signature: &Signature, public_key: PublicKey, expected: &[u8]) -> bool {
+/// Verifies a match between the provided signature and expected message, given a specific public key, using ed25519.
+/// This returns true if and only if the verification succeeds. It returns false otherwise.
+pub fn verify_signature(signature: &Signature, public_key: &PublicKey, expected: &[u8]) -> bool {
     public_key.verify_strict(expected, signature).is_ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{sign_message, verify_signature};
+    use crate::key_gen_utils;
+    use ed25519_dalek::{Keypair, PublicKey, SecretKey};
+    use rand::Rng;
+
+    #[test]
+    fn verify_signature_succeeds() {
+        // ===== Arrange ===== //
+        let message: [u8; 32] = rand::thread_rng().gen();
+        let test_keys = key_gen_utils::generate_new_signing_keys();
+
+        // ===== Act ===== //
+        let signature = sign_message(&message, &test_keys);
+
+        // ===== Arrange ===== //
+        assert!(verify_signature(&signature, &test_keys.public, &message));
+    }
+
+    #[test]
+    fn ensure_correct_signature_is_produced() {
+        // ===== Arrange ===== //
+        let message = [
+            0x79, 0xE8, 0x9F, 0x72, 0xA0, 0x05, 0x5C, 0xDF, 0x13, 0xC3, 0x4A, 0x3C, 0x96, 0xB3, 0xFD, 0xE8,
+            0xAB, 0x63, 0x6B, 0x11, 0xFE, 0x94, 0xFF, 0xA6, 0x77, 0xDE, 0x47, 0x25, 0x06, 0x83, 0xF2, 0x6C,
+        ];
+        let public_key = [
+            0x43, 0x47, 0x6D, 0x6C, 0x27, 0xBE, 0x52, 0x5C, 0x44, 0xDC, 0xC6, 0x52, 0xDD, 0x77, 0xEE, 0xE2,
+            0x5F, 0xCA, 0x54, 0xDF, 0x08, 0x06, 0xF5, 0x2F, 0xDE, 0x1D, 0x3D, 0x62, 0xB6, 0x8F, 0xFA, 0x83,
+        ];
+        let private_key = [
+            0x0A, 0x2F, 0xF7, 0xBA, 0x86, 0xC9, 0x26, 0x4E, 0xD4, 0xF9, 0x2E, 0x7D, 0x9D, 0x71, 0xA0, 0xE3,
+            0x7D, 0xCA, 0xC3, 0x2A, 0x05, 0x25, 0x3A, 0x26, 0x81, 0xDC, 0x15, 0x71, 0x91, 0x9E, 0x5D, 0xA3,
+        ];
+        let test_keys = Keypair {
+            public: PublicKey::from_bytes(&public_key).unwrap(),
+            secret: SecretKey::from_bytes(&private_key).unwrap(),
+        };
+
+        // ===== Act ===== //
+        let signature = sign_message(&message, &test_keys);
+
+        // ===== Assert ===== //
+        let expected = [
+            0x24, 0x23, 0x8F, 0x2B, 0x42, 0x92, 0xCD, 0x01, 0x50, 0xD8, 0xD0, 0x58, 0xE1, 0x50, 0x0F, 0x63,
+            0xB5, 0x7E, 0xCE, 0xFD, 0xCF, 0x58, 0x4C, 0xEE, 0xB5, 0x65, 0x63, 0x01, 0x0D, 0x11, 0x5D, 0x90,
+            0xF4, 0x05, 0x49, 0x32, 0x4B, 0xA5, 0x05, 0x11, 0x20, 0xE5, 0x1D, 0x76, 0x56, 0x59, 0x22, 0x4B,
+            0x4D, 0x9A, 0xE4, 0x0F, 0x09, 0xFC, 0x47, 0xD2, 0x56, 0x67, 0x99, 0x31, 0x3F, 0x46, 0xD1, 0x03,
+        ];
+        assert_eq!(signature.to_bytes(), expected);
+    }
 }

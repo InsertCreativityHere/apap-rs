@@ -17,10 +17,15 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use rand::Rng;
 
+use aes::Aes256;
+use cipher::Key;
+
+// TODO add a license, README, cleanup the gitignore, and modify Cargo config file.
+
 // TODO add module comments to things.
 // TODO maybe zeroize other things?
 
-
+// TODO should we test `ReadResult::Error`?
 
 // ===========================================================================================
 // Okay, I think that we have literally everything we need now to implement the fils structure.
@@ -71,7 +76,7 @@ use rand::Rng;
 
 pub fn encrypt_file(
     file_path: &str,
-    master_encryption_key: &[u8; 32],
+    master_encryption_key: &Key<Aes256>,
     signing_keys: ed25519_dalek::Keypair,
 ) {
     // Open the file we're going to encrypt.

@@ -61,6 +61,7 @@ impl StreamCipher {
 #[cfg(test)]
 mod tests {
     use super::StreamCipher;
+    use crate::key_gen_utils;
     use rand::Rng;
     use rayon::prelude::*;
 
@@ -71,7 +72,7 @@ mod tests {
 
         let mut buffer = plain_text.clone();
         let iv: u128 = rand::thread_rng().gen();
-        let test_key: [u8; 32] = rand::thread_rng().gen();
+        let test_key = key_gen_utils::generate_new_encryption_key();
         let stream_cipher = StreamCipher::initialize((&test_key).into());
         
         // ===== Act ===== //
