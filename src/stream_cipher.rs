@@ -74,7 +74,7 @@ mod tests {
         let iv: u128 = rand::thread_rng().gen();
         let test_key = key_gen_utils::generate_new_encryption_key();
         let stream_cipher = StreamCipher::initialize((&test_key).into());
-        
+
         // ===== Act ===== //
         stream_cipher.process_block(iv, &mut buffer);
         stream_cipher.process_block(iv, &mut buffer);
@@ -103,7 +103,7 @@ mod tests {
         let iv = 797979797979_u128;
 
         // ===== Act ===== //
-        let plain_text_chunks: &mut [[u8; 16]] = unsafe { test_buffer.as_chunks_unchecked_mut() } ;
+        let plain_text_chunks: &mut [[u8; 16]] = unsafe { test_buffer.as_chunks_unchecked_mut() };
         stream_cipher.process_blocks(
             plain_text_chunks
                 .into_par_iter()

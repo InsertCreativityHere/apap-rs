@@ -1,8 +1,8 @@
 
 use aes::Aes256;
 use cipher::Key;
-use sha2::{Digest, Sha256};
 use rand::Rng;
+use sha2::{Digest, Sha256};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// This struct is used to create and store derivative keys from a master key.
@@ -45,7 +45,7 @@ impl DerivedKeyData {
         let mut key_generator = Sha256::new();
         key_generator.update(master_key);
         key_generator.update(key_salt.to_be_bytes());
-        key_generator.finalize().into()
+        key_generator.finalize()
     }
 }
 

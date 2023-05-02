@@ -1,14 +1,14 @@
 
-use std::io::{Error, ErrorKind, Read};
+use std::io::{Error, ErrorKind, Read, Result};
 
 /// This function attempts to fill the provided buffer with bytes read from the specified source.
 ///
 /// It continues to call read on the source until:
 /// - The buffer has been completely filled with data. In this case [`ReadResult::Full`] is returned.
-/// - The end of the reader was hit before the buffer could be filled. In this case [`ReadResult::EOS`] is returned.
+/// - The end of the reader was hit before the buffer could be filled. In this case [`ReadResult::Eos`] is returned.
 /// - An attempt to read fails with an error other than [`ErrorKind::Interrupted`].
 ///   In this case [`ReadResult::Error`] is returned. If this function encounters [`ErrorKind::Interrupted`],
-///   it is ignored, and the source will be polled again for more data. 
+///   it is ignored, and the source will be polled again for more data.
 pub fn read_to_buffer(reader: &mut impl Read, mut buffer: &mut [u8]) -> ReadResult {
     let initial_length = buffer.len();
 
@@ -23,7 +23,7 @@ pub fn read_to_buffer(reader: &mut impl Read, mut buffer: &mut [u8]) -> ReadResu
 
     match buffer.len() {
         0 => ReadResult::Full,
-        len => ReadResult::EOS(initial_length - len),
+        len => ReadResult::Eos(initial_length - len),
     }
 }
 
@@ -34,11 +34,23 @@ pub enum ReadResult {
     Full,
 
     /// Indicates that End-Of-Stream was hit before the provided buffer could be completely filled.
-    /// The associated value is the number of bytes that were read before hitting EOS.
-    EOS(usize),
+    /// The associated value is the number of bytes that were read before hitting Eos.
+    Eos(usize),
 
     /// An error was encountered while reading from the source.
-    Error(Error)
+    Error(Error),
+}
+
+impl ReadResult {
+    /// Converts this `ReadResult` into an (`io::Result`)[Result].
+    /// `Eos` and `Error` are converted to `Err` and `Full` is converted to `Ok`.
+    pub fn into_result(self) -> Result<()> {
+        match self {
+            Self::Full => Ok(()),
+            Self::Eos(_) => Err(ErrorKind::UnexpectedEof.into()),
+            Self::Error(error) => Err(error),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -55,7 +67,7 @@ mod tests {
         let result = read_to_buffer(&mut source, &mut buffer);
 
         // ===== Assert ===== //
-        assert!(matches!(result, ReadResult::EOS(0)));
+        assert!(matches!(result, ReadResult::Eos(0)));
     }
 
     #[test]
@@ -68,7 +80,7 @@ mod tests {
         let result = read_to_buffer(&mut source, &mut buffer);
 
         // ===== Assert ===== //
-        assert!(matches!(result, ReadResult::EOS(8)));
+        assert!(matches!(result, ReadResult::Eos(8)));
     }
 
     #[test]
@@ -84,7 +96,7 @@ mod tests {
         let result = read_to_buffer(&mut source, &mut buffer);
 
         // ===== Assert ===== //
-        assert!(matches!(result, ReadResult::EOS(24)));
+        assert!(matches!(result, ReadResult::Eos(24)));
     }
 
     #[test]
@@ -96,13 +108,13 @@ mod tests {
         let pre_result = read_to_buffer(&mut source, &mut buffer);
         assert!(matches!(pre_result, ReadResult::Full));
         let pre_result = read_to_buffer(&mut source, &mut buffer);
-        assert!(matches!(pre_result, ReadResult::EOS(2)));
+        assert!(matches!(pre_result, ReadResult::Eos(2)));
 
         // ===== Act ===== //
         let result = read_to_buffer(&mut source, &mut buffer);
 
         // ===== Assert ===== //
-        assert!(matches!(result, ReadResult::EOS(0)));
+        assert!(matches!(result, ReadResult::Eos(0)));
     }
 
     #[test]
