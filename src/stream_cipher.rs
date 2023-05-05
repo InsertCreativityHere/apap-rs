@@ -17,9 +17,8 @@ impl StreamCipher {
         Self { engine }
     }
 
-    /// Encrypts/Decrypts the provided block with an AES-256 CTR encryption scheme.
+    /// Encrypt/Decrypt the provided block with an AES-256 CTR encryption scheme.
     /// The block should be 16 bytes or less, since AES can only process 128 bits at a time.
-    /// If a larger block is provided, only the first 16 bytes will be processed; any remaining bytes are unmodified.
     ///
     /// The provided counter value is encrypted with AES-256 and then XOR'd with the block.
     /// Because the XOR operation is an involution, applying this function twice will yield the original block.
@@ -31,26 +30,26 @@ impl StreamCipher {
         let mut counter_bytes = counter.to_be_bytes();
         self.engine.encrypt_block((&mut counter_bytes).into());
 
-        // XOR the block with the encrypted counter in-place.
+        // XOR the block with the encrypted counter value in-place.
         for i in 0..block.len() {
             block[i] ^= counter_bytes[i];
         }
     }
 
-    /// Encrypts/Decrypts the provided blocks with an AES-256 CTR encryption scheme.
-    /// Each block must be exactly 16 bytes long for performance, since AES operates on 128 bit blocks.
-    /// For smaller blocks, use [Self::process_blocks] instead.
+    /// Encrypt/Decrypt the provided blocks with an AES-256 CTR encryption scheme.
+    /// For performance, this function requires each block to be exactly 16 bytes long, since AES operates on 128 bit
+    /// blocks. For smaller blocks, use [Self::process_blocks] instead. 
     ///
     /// The provided counter value is encrypted with AES-256 and then XOR'd with the block.
     /// Because the XOR operation is an involution, applying this function twice will yield the original block.
     pub fn process_blocks<'a>(&self, block_buffer: impl ParallelIterator<Item = (u128, &'a mut [u8; 16])>) {
-        // Iterate through the (block,counter) pairs in parallel for efficiency.
+        // Iterate through the (block, counter) pairs in parallel for efficiency.
         block_buffer.for_each(|(counter, block)| {
             // Encrypt the block's corresponding counter value.
             let mut counter_bytes = counter.to_be_bytes();
             self.engine.encrypt_block((&mut counter_bytes).into());
 
-            // XOR the block with the encrypted counter in-place.
+            // XOR the block with the encrypted counter value in-place.
             for i in 0..16 {
                 block[i] ^= counter_bytes[i];
             }

@@ -1,13 +1,13 @@
 
 use ed25519_dalek::{ExpandedSecretKey, Keypair, Signature, PublicKey};
 
-/// Signs the message with the provided key pair using an ed25519 signature scheme.
+/// Sign the provided message with an ed25519 key pair.
 pub fn sign_message(message: &[u8], signing_keys: &Keypair) -> Signature {
     let expanded_key = ExpandedSecretKey::from(&signing_keys.secret);
     expanded_key.sign(message, &signing_keys.public)
 }
 
-/// Verifies a match between the provided signature and expected message, given a specific public key, using ed25519.
+/// Verify a match between the provided signature and expected message, given a specific public key, using ed25519.
 /// This returns true if and only if the verification succeeds. It returns false otherwise.
 pub fn verify_signature(signature: &Signature, public_key: &PublicKey, expected: &[u8]) -> bool {
     public_key.verify_strict(expected, signature).is_ok()

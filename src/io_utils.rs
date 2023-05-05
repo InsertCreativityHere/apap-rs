@@ -1,14 +1,13 @@
 
 use std::io::{Error, ErrorKind, Read, Result};
 
-/// This function attempts to fill the provided buffer with bytes read from the specified source.
+/// Attempt to completely fill the provided buffer with bytes read from the specified source.
 ///
 /// It continues to call read on the source until:
-/// - The buffer has been completely filled with data. In this case [`ReadResult::Full`] is returned.
-/// - The end of the reader was hit before the buffer could be filled. In this case [`ReadResult::Eos`] is returned.
-/// - An attempt to read fails with an error other than [`ErrorKind::Interrupted`].
-///   In this case [`ReadResult::Error`] is returned. If this function encounters [`ErrorKind::Interrupted`],
-///   it is ignored, and the source will be polled again for more data.
+/// - The buffer has been completely filled with data; in this case [`ReadResult::Full`] is returned.
+/// - The reader returned EOS before the buffer could be filled; in this case [`ReadResult::Eos`] is returned.
+/// - A read fails with an error other than [`ErrorKind::Interrupted`]; in this case [`ReadResult::Error`] is returned.
+///   If a read returns [`ErrorKind::Interrupted`], it is ignored, and the source will be polled again for more data.
 pub fn read_to_buffer(reader: &mut impl Read, mut buffer: &mut [u8]) -> ReadResult {
     let initial_length = buffer.len();
 
@@ -37,13 +36,13 @@ pub enum ReadResult {
     /// The associated value is the number of bytes that were read before hitting Eos.
     Eos(usize),
 
-    /// An error was encountered while reading from the source.
+    /// An unrecoverable error was encountered while reading from the source.
     Error(Error),
 }
 
 impl ReadResult {
     /// Converts this `ReadResult` into an (`io::Result`)[Result].
-    /// `Eos` and `Error` are converted to `Err` and `Full` is converted to `Ok`.
+    /// [`ReadResult::Eos`] and [`ReadResult::Error`] are mapped to `Err` and [`ReadResult::Full`] is mapped to `Ok`.
     pub fn into_result(self) -> Result<()> {
         match self {
             Self::Full => Ok(()),

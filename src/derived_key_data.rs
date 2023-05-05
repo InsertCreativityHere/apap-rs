@@ -25,22 +25,20 @@ pub struct DerivedKeyData {
 }
 
 impl DerivedKeyData {
-    /// Derive a key from the provided master key by hashing it with a randomly generated 64bit salt:
+    /// Derive a new key from the provided master key by hashing it with a random 64bit salt value:
     /// `derived_key = sha256([master_key][key_salt])`
-    /// Both keys are/must be 256 bits in length.
     pub fn derive_new_from(master_key: &Key<Aes256>) -> Self {
         // Randomly generate a salt value to hash with the provided key.
         let key_salt: u64 = rand::thread_rng().gen();
 
         // Compute the derived key and return it alongside the salt that was used.
-        let derived_key = Self::derive_from(master_key, key_salt);
+        let derived_key = Self::re_derive_from(master_key, key_salt);
         DerivedKeyData { derived_key, key_salt }
     }
 
-    /// Derive a key from the provided master key by hashing it with the specified salt:
+    /// Re-derive a key from the provided master key by hashing it with a specific salt value:
     /// `derived_key = sha256([master_key][key_salt])`
-    /// Both keys are/must be 256 bits in length.
-    pub fn derive_from(master_key: &Key<Aes256>, key_salt: u64) -> Key<Aes256> {
+    pub fn re_derive_from(master_key: &Key<Aes256>, key_salt: u64) -> Key<Aes256> {
         // Hash the provided master key with the randomly generated salt.
         let mut key_generator = Sha256::new();
         key_generator.update(master_key);
@@ -61,7 +59,7 @@ mod tests {
 
         // ===== Act ===== //
         let DerivedKeyData { derived_key, key_salt } = DerivedKeyData::derive_new_from(&test_key);
-        let rederived_key = DerivedKeyData::derive_from(&test_key, key_salt);
+        let rederived_key = DerivedKeyData::re_derive_from(&test_key, key_salt);
 
         // ===== Assert ===== //
         assert_eq!(derived_key, rederived_key, "master_key = '{test_key:?}', salt = '{key_salt:?}'");
