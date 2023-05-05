@@ -38,20 +38,20 @@
 // TODO refactor common logic into helper functions. For example: 'decrypt_file_checked' and 'decrypt_file_unchecked'
 // are basically the same thing, we can probably simplify them without losing performance.
 
-pub mod decryption;
-pub mod encryption;
-mod constants;
-mod content_summarizer;
-mod derived_key_data;
-mod io;
-mod key_gen_utils;
-mod signature_utils;
-mod stream_cipher;
+pub mod constants;
+pub mod content_summarizer;
+pub mod decryption_io;
+pub mod encryption_io;
+pub mod io_utils;
+pub mod key_derivation;
+pub mod key_gen_utils;
+pub mod signature_utils;
+pub mod stream_cipher;
 
 use crate::content_summarizer::ContentSummarizer;
-use crate::decryption::{CipherFileReader, PlainFileWriter};
-use crate::derived_key_data::DerivedKeyData;
-use crate::encryption::{CipherFileWriter, PlainFileReader};
+use crate::decryption_io::{CipherFileReader, PlainFileWriter};
+use crate::encryption_io::{CipherFileWriter, PlainFileReader};
+use crate::key_derivation::DerivedKeyData;
 use crate::stream_cipher::StreamCipher;
 use std::collections::HashSet;
 use std::io::{Error, ErrorKind, Result};
