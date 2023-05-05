@@ -28,6 +28,16 @@
 
 // TODO add user interactivity (that can be undone with a command line flag).
 
+// TODO ask the user if the file length is okay before decrypting a file!
+
+// TODO stop assuming file extension exists, allow command line output option.
+// Or if the extension is missing, we always prompt the user for an output path.
+
+// TODO try to clean up files if encryption/decryption fails partway through?
+
+// TODO refactor common logic into helper functions. For example: 'decrypt_file_checked' and 'decrypt_file_unchecked'
+// are basically the same thing, we can probably simplify them without losing performance.
+
 pub mod decryption;
 pub mod encryption;
 mod constants;
@@ -39,6 +49,7 @@ mod signature_utils;
 mod stream_cipher;
 
 use crate::content_summarizer::ContentSummarizer;
+use crate::decryption::{CipherFileReader, PlainFileWriter};
 use crate::derived_key_data::DerivedKeyData;
 use crate::encryption::{CipherFileWriter, PlainFileReader};
 use crate::stream_cipher::StreamCipher;
@@ -47,7 +58,6 @@ use std::io::{Error, ErrorKind, Result};
 use std::path::{Path, PathBuf};
 use aes::Aes256;
 use cipher::Key;
-use decryption::CipherFileReader;
 use ed25519_dalek::{Keypair, PublicKey, Signature};
 use io_utils::ReadResult;
 use rand::Rng;
@@ -63,6 +73,13 @@ pub fn verify_file(
     // Open the file we're going to verify.
     let mut input_file = CipherFileReader::open(input_path)?;
 
+    // Ensure the public key that was used to sign the file is trusted by the user.
+    let public_signing_key = PublicKey::from_bytes(&input_file.header().signature_key)
+        .map_err(|error| Error::new(ErrorKind::Other, error))?;
+    if !trusted_public_keys.contains(public_signing_key.as_bytes()) {
+        return Err(Error::new(ErrorKind::Other, "File is signed with an untrusted key")); // TODO better message and functionality
+    }
+
     // Create a summarizer to digest the inputted cipher text.
     let mut summarizer = ContentSummarizer::default();
 
@@ -72,6 +89,7 @@ pub fn verify_file(
     // Loop through the data in the input file.
     let expected_content_length = input_file.header().content_length;
     while counter < expected_content_length {
+        // TODO
         let read_length = std::cmp::min((expected_content_length - counter) as usize, buffer.len());
         let read_buffer = &mut buffer[0..read_length];
 
@@ -104,13 +122,6 @@ pub fn verify_file(
         input_file.header().encryption_key_salt,
     );
     debug_assert_eq!(content_length, expected_content_length);
-
-    // TODO
-    let public_signing_key = PublicKey::from_bytes(&input_file.header().signature_key)
-        .map_err(|error| Error::new(ErrorKind::Other, error))?;
-    if !trusted_public_keys.contains(public_signing_key.as_bytes()) {
-        return Err(Error::new(ErrorKind::Other, "File is signed with an untrusted key")); // TODO better message and functionality
-    }
 
     // TODO
     let signature = Signature::from_bytes(&input_file.header().signature)
@@ -155,11 +166,11 @@ pub fn encrypt_file(
     let cipher = StreamCipher::initialize(&derived_key);
     derived_key.zeroize();
 
+    // Randomly generate a 128bit value to start the AES-CTR counter at.
+    let initial_value = rand::thread_rng().gen();
+
     // Create a summarizer to digest the outputted cipher text.
     let mut summarizer = ContentSummarizer::default();
-
-    // Randomly generate a 128bit value to start the AES-CTR counter at.
-    let initial_value: u128 = rand::thread_rng().gen();
 
     // Allocate a working buffer and counter.
     let mut buffer = [0_u8; 16384];
@@ -211,6 +222,189 @@ pub fn encrypt_file(
     output_file.finalize(signing_keys, summarizer, initial_value, key_salt)
 }
 
+pub fn decrypt_file_checked(
+    input_path: &(impl AsRef<Path> + ?Sized),
+    master_encryption_key: &Key<Aes256>,
+    trusted_public_keys: &HashSet<[u8; 32]>,
+    expect_eof: bool,
+) -> Result<()> {
+    // Open the input file we're going to decrypt.
+    let mut input_file = CipherFileReader::open(input_path)?;
+
+    // Ensure the public key that was used to sign the file is trusted by the user.
+    let public_signing_key = PublicKey::from_bytes(&input_file.header().signature_key)
+        .map_err(|error| Error::new(ErrorKind::Other, error))?;
+    if !trusted_public_keys.contains(public_signing_key.as_bytes()) {
+        return Err(Error::new(ErrorKind::Other, "File is signed with an untrusted key")); // TODO better message and functionality
+    }
+
+    // Create a file to write the output into. It's the same as the input, but without a trailing ".arh" extension.
+    let mut output_file_path = input_path.as_ref().to_owned();
+    output_file_path.set_extension(
+        input_path.as_ref()
+            .extension()
+            .map_or(
+                PathBuf::from("dec"),
+                |extension| {
+                    // TODO MAKE THIS THE REAL FILE NAME!
+                    let mut new_extension = extension.to_owned();
+                    new_extension.push(".dec");
+                    PathBuf::from(new_extension)
+                },
+            )
+    );
+    let mut output_file = PlainFileWriter::create_new(output_file_path)?;
+
+    // Compute the encryption key used by this file with the provided master key and salt value in this file's header.
+    let mut derived_key = DerivedKeyData::re_derive_from(master_encryption_key, input_file.header().encryption_key_salt);
+    // Initialize a stream cipher with the derived key, then attempt to destroy it in memory.
+    let cipher = StreamCipher::initialize(&derived_key);
+    derived_key.zeroize();
+
+    // Load the initial value to start the AES-CTR counter at.
+    let initial_value = input_file.header().initial_counter_value;
+
+    // Create a summarizer to digest the inputted cipher text.
+    let mut summarizer = ContentSummarizer::default();
+
+    // Allocate a working buffer and counters.
+    let mut buffer = [0_u8; 16384];
+    let mut counter = 0;
+    // Loop through the data in the input file.
+    let expected_content_length = input_file.header().content_length;
+    while counter < expected_content_length {
+        // TODO
+        let read_length = std::cmp::min((expected_content_length - counter) as usize, buffer.len());
+        let read_buffer = &mut buffer[0..read_length];
+
+        match input_file.try_read_from(read_buffer) {
+            // TODO
+            ReadResult::Full => {
+                summarizer.update(read_buffer);
+
+                let (blocks, remainder) = read_buffer.as_chunks_mut::<16>();
+                let block_counter_pairs = blocks.into_par_iter()
+                    .enumerate()
+                    .map(|(index, block)| (initial_value + (index as u128) + (counter as u128), block));
+
+                cipher.process_blocks(block_counter_pairs);
+                cipher.process_block(initial_value + (blocks.len() as u128) + (counter as u128), remainder);
+
+                output_file.write_content(read_buffer)?;
+                counter += read_length as u64;
+            }
+
+            // TODO
+            ReadResult::Eos(length) => {
+                counter += length as u64;
+                let message = format!("File header specified it contained {expected_content_length} bytes, but EOF was encountered after reading only {counter} bytes.");
+                return Err(Error::new(ErrorKind::UnexpectedEof, message));
+            }
+
+            // If we encounter an unrecoverable error while reading, return it immediately.
+            ReadResult::Error(error) => return Err(error),
+        }
+    }
+    debug_assert_eq!(counter, expected_content_length);
+
+    // Ensure that the file ends with a `FILE_END` marker, and that EOF is immediately after if `expect_eof` is true.
+    input_file.check_file_end(expect_eof)?;
+
+    // Compute a hash of the file's content.
+    let (hash_value, content_length) = summarizer.finalize(
+        input_file.header().initial_counter_value,
+        input_file.header().encryption_key_salt,
+    );
+    debug_assert_eq!(content_length, expected_content_length);
+
+    // TODO
+    let signature = Signature::from_bytes(&input_file.header().signature)
+        .map_err(|error| Error::new(ErrorKind::Other, error))?;
+    if !signature_utils::verify_signature(&signature, &public_signing_key, &hash_value) {
+        return Err(Error::new(ErrorKind::Other, "File signature does not match contents! File has been altered or corrupted.")) // TODO better message
+    }
+
+    Ok(())
+}
+
+pub fn decrypt_file_unchecked(
+    input_path: &(impl AsRef<Path> + ?Sized),
+    master_encryption_key: &Key<Aes256>,
+    expect_eof: bool,
+) -> Result<()> {
+    // Open the input file we're going to decrypt.
+    let mut input_file = CipherFileReader::open(input_path)?;
+
+    // Create a file to write the output into. It's the same as the input, but without a trailing ".arh" extension.
+    let mut output_file_path = input_path.as_ref().to_owned();
+    output_file_path.set_extension(
+        input_path.as_ref()
+            .extension()
+            .map_or(
+                PathBuf::from("dec"),
+                |extension| {
+                    // TODO MAKE THIS THE REAL FILE NAME!
+                    let mut new_extension = extension.to_owned();
+                    new_extension.push(".dec");
+                    PathBuf::from(new_extension)
+                },
+            )
+    );
+    let mut output_file = PlainFileWriter::create_new(output_file_path)?;
+
+    // Compute the encryption key used by this file with the provided master key and salt value in this file's header.
+    let mut derived_key = DerivedKeyData::re_derive_from(master_encryption_key, input_file.header().encryption_key_salt);
+    // Initialize a stream cipher with the derived key, then attempt to destroy it in memory.
+    let cipher = StreamCipher::initialize(&derived_key);
+    derived_key.zeroize();
+
+    // Load the initial value to start the AES-CTR counter at.
+    let initial_value = input_file.header().initial_counter_value;
+
+    // Allocate a working buffer and counters.
+    let mut buffer = [0_u8; 16384];
+    let mut counter = 0;
+    // Loop through the data in the input file.
+    let expected_content_length = input_file.header().content_length;
+    while counter < expected_content_length {
+        // TODO
+        let read_length = std::cmp::min((expected_content_length - counter) as usize, buffer.len());
+        let read_buffer = &mut buffer[0..read_length];
+
+        match input_file.try_read_from(read_buffer) {
+            // TODO
+            ReadResult::Full => {
+                let (blocks, remainder) = read_buffer.as_chunks_mut::<16>();
+                let block_counter_pairs = blocks.into_par_iter()
+                    .enumerate()
+                    .map(|(index, block)| (initial_value + (index as u128) + (counter as u128), block));
+
+                cipher.process_blocks(block_counter_pairs);
+                cipher.process_block(initial_value + (blocks.len() as u128) + (counter as u128), remainder);
+
+                output_file.write_content(read_buffer)?;
+                counter += read_length as u64;
+            }
+
+            // TODO
+            ReadResult::Eos(length) => {
+                counter += length as u64;
+                let message = format!("File header specified it contained {expected_content_length} bytes, but EOF was encountered after reading only {counter} bytes.");
+                return Err(Error::new(ErrorKind::UnexpectedEof, message));
+            }
+
+            // If we encounter an unrecoverable error while reading, return it immediately.
+            ReadResult::Error(error) => return Err(error),
+        }
+    }
+    debug_assert_eq!(counter, expected_content_length);
+
+    // Ensure that the file ends with a `FILE_END` marker, and that EOF is immediately after if `expect_eof` is true.
+    input_file.check_file_end(expect_eof)?;
+
+    Ok(())
+}
+
 
 
 fn main() {
@@ -231,6 +425,14 @@ fn main() {
         Ok(_) => println!("Finished verifying Successfully!"),
         Err(err) => {
             println!("Verification Error: {err:?}");
+            return;
+        }
+    }
+
+    match decrypt_file_checked("/Users/austin/archive-fs/test.txt.arh", &master_encryption_key, &trusted_public_keys, true) {
+        Ok(_) => println!("Finished decrypting Successfully!"),
+        Err(err) => {
+            println!("Decryption Error: {err:?}");
             return;
         }
     }
