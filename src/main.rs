@@ -43,7 +43,7 @@ pub mod encryption;
 mod constants;
 mod content_summarizer;
 mod derived_key_data;
-mod io_utils;
+mod io;
 mod key_gen_utils;
 mod signature_utils;
 mod stream_cipher;
@@ -63,6 +63,16 @@ use io_utils::ReadResult;
 use rand::Rng;
 use rayon::prelude::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use zeroize::Zeroize;
+
+pub struct Header {
+    pub signature_key: [u8; 32],
+    pub signature: [u8; 64],
+
+    pub initial_counter_value: u128,
+    pub encryption_key_salt: u64,
+
+    pub content_length: u64,
+}
 
 /// TODO
 pub fn verify_file(
@@ -216,10 +226,21 @@ pub fn encrypt_file(
             ReadResult::Error(error) => return Err(error),
         }
     }
+    // Hitting this point means we've finished writing the contents of the encrypted output file.
 
-    // We've finished writing the contents of the encrypted output file.
-    // Before returning, we finalize the file by writing the ARH wrapper around the contents.
-    output_file.finalize(signing_keys, summarizer, initial_value, key_salt)
+    // Compute a hash for the file's contents and sign it with the provided key pair.
+    let (hash_value, content_length) = summarizer.finalize(initial_value, key_salt);
+    let signed_hash_value = signature_utils::sign_message(&hash_value, signing_keys);
+
+    // Finalize the file by writing an ARH header and footer around the contents we've finished writing.
+    let header = Header {
+        signature_key: signing_keys.public.to_bytes(),
+        signature: signed_hash_value.to_bytes(),
+        initial_counter_value: initial_value,
+        encryption_key_salt: key_salt,
+        content_length,
+    };
+    output_file.finalize(&header)
 }
 
 pub fn decrypt_file_checked(

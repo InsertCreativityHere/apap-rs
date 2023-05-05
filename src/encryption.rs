@@ -1,11 +1,10 @@
 
-use crate::content_summarizer::ContentSummarizer;
+use crate::constants::*;
 use crate::io_utils::{read_to_buffer, ReadResult};
-use crate::{constants::*, signature_utils};
+use crate::Header;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Result, Seek, SeekFrom, Write};
 use std::path::Path;
-use ed25519_dalek::Keypair;
 
 pub struct PlainFileReader {
     file: File,
@@ -43,16 +42,7 @@ impl CipherFileWriter {
         self.file.write_all(content)
     }
 
-    pub fn finalize(
-        mut self,
-        signing_keys: &Keypair,
-        content_summarizer: ContentSummarizer,
-        initial_counter_value: u128,
-        encryption_key_salt: u64,
-    ) -> Result<()> {
-        let (hash_value, content_length) = content_summarizer.finalize(initial_counter_value, encryption_key_salt);
-        let signed_hash_value = signature_utils::sign_message(&hash_value, signing_keys);
-
+    pub fn finalize(mut self, header: &Header) -> Result<()> {
         self.file.write_all(&FILE_END)?;
 
         let start_offset = self.file.seek(SeekFrom::Start(0))?;
@@ -62,11 +52,11 @@ impl CipherFileWriter {
         }
 
         self.file.write_all(&FILE_BEG)?;
-        self.file.write_all(signing_keys.public.as_bytes())?;
-        self.file.write_all(&signed_hash_value.to_bytes())?;
-        self.file.write_all(&initial_counter_value.to_be_bytes())?;
-        self.file.write_all(&encryption_key_salt.to_be_bytes())?;
-        self.file.write_all(&content_length.to_be_bytes())?;
+        self.file.write_all(&header.signature_key)?;
+        self.file.write_all(&header.signature)?;
+        self.file.write_all(&header.initial_counter_value.to_be_bytes())?;
+        self.file.write_all(&header.encryption_key_salt.to_be_bytes())?;
+        self.file.write_all(&header.content_length.to_be_bytes())?;
 
         let header_offset = self.file.stream_position()?;
         if header_offset != FILE_HEADER_SIZE {

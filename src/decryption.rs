@@ -1,12 +1,10 @@
 
 use crate::constants::*;
 use crate::io_utils::{read_to_buffer, ReadResult};
+use crate::Header;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Read, Result, Seek, Write};
 use std::path::Path;
-
-
-
 
 pub struct PlainFileWriter {
     file: File,
@@ -22,18 +20,6 @@ impl PlainFileWriter {
         self.file.write_all(content)
     }
 }
-
-
-pub struct Header {
-    pub signature_key: [u8; 32],
-    pub signature: [u8; 64],
-    
-    pub initial_counter_value: u128,
-    pub encryption_key_salt: u64,
-
-    pub content_length: u64,
-}
-
 
 pub struct CipherFileReader {
     file: File,
