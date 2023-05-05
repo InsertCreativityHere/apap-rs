@@ -38,7 +38,7 @@ impl StreamCipher {
 
     /// Encrypt/Decrypt the provided blocks with an AES-256 CTR encryption scheme.
     /// For performance, this function requires each block to be exactly 16 bytes long, since AES operates on 128 bit
-    /// blocks. For smaller blocks, use [Self::process_blocks] instead. 
+    /// blocks. For smaller blocks, use [Self::process_blocks] instead.
     ///
     /// The provided counter value is encrypted with AES-256 and then XOR'd with the block.
     /// Because the XOR operation is an involution, applying this function twice will yield the original block.
