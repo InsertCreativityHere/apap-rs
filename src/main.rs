@@ -17,7 +17,7 @@
 // Maybe we should test `ReadResult::Error`?
 // Should we be zeroing other things?
 
-// Instead of taking files, maybe the encryption/decryption should just take Readers/Writers so we can have in-memory tests.
+// TODO: go through everywhere we say 'file' and make sure it's abstracted correctly.
 
 // TODO: go through and improve all the error messages to actually report useful information.
 
@@ -45,8 +45,8 @@ pub mod signature_utils;
 pub mod stream_cipher;
 
 use crate::content_summarizer::ContentSummarizer;
-use crate::decryption_io::{CipherFileReader, PlainFileWriter};
-use crate::encryption_io::{CipherFileWriter, PlainFileReader};
+use crate::decryption_io::{CipherTextReader, PlainTextWriter};
+use crate::encryption_io::{CipherTextWriter, PlainTextReader};
 use crate::key_gen_utils::DerivedKeyData;
 use crate::stream_cipher::StreamCipher;
 use std::collections::HashSet;
@@ -77,7 +77,7 @@ pub fn verify_file(
     expect_eof: bool,
 ) -> Result<()> {
     // Open the file we're going to verify.
-    let mut input_file = CipherFileReader::open(input_path)?;
+    let mut input_file = CipherTextReader::open_from_file(input_path)?;
 
     // Ensure the public key that was used to sign the file is trusted by the user.
     let public_signing_key = PublicKey::from_bytes(&input_file.header().signature_key)
@@ -146,7 +146,7 @@ pub fn encrypt_file(
     signing_keys: &Keypair,
 ) -> Result<()> {
     // Open the file we're going to encrypt.
-    let mut input_file = PlainFileReader::open(input_path)?;
+    let mut input_file = PlainTextReader::open_from_file(input_path)?;
 
     // Create a file to write the output into. It's the same as the input, but with ".arh" appended to it.
     let mut output_file_path = input_path.as_ref().to_owned();
@@ -162,7 +162,7 @@ pub fn encrypt_file(
                 },
             )
     );
-    let mut output_file = CipherFileWriter::create_new(output_file_path)?;
+    let mut output_file = CipherTextWriter::create_new_file(output_file_path)?;
 
     // Create an encryption key specific to this file, derived from the provided master key.
     // This ensures that even if an attacker manages to compromise this data or determine the key used to encrypt it,
@@ -236,7 +236,7 @@ pub fn encrypt_file(
         encryption_key_salt: key_salt,
         content_length,
     };
-    output_file.finalize(&header)
+    output_file.finalize_and_sync(&header)
 }
 
 pub fn decrypt_file_checked(
@@ -246,7 +246,7 @@ pub fn decrypt_file_checked(
     expect_eof: bool,
 ) -> Result<()> {
     // Open the input file we're going to decrypt.
-    let mut input_file = CipherFileReader::open(input_path)?;
+    let mut input_file = CipherTextReader::open_from_file(input_path)?;
 
     // Ensure the public key that was used to sign the file is trusted by the user.
     let public_signing_key = PublicKey::from_bytes(&input_file.header().signature_key)
@@ -270,7 +270,7 @@ pub fn decrypt_file_checked(
                 },
             )
     );
-    let mut output_file = PlainFileWriter::create_new(output_file_path)?;
+    let mut output_file = PlainTextWriter::create_new_file(output_file_path)?;
 
     // Compute the encryption key used by this file with the provided master key and salt value in this file's header.
     let mut derived_key = DerivedKeyData::re_derive_from(master_encryption_key, input_file.header().encryption_key_salt);
@@ -350,7 +350,7 @@ pub fn decrypt_file_unchecked(
     expect_eof: bool,
 ) -> Result<()> {
     // Open the input file we're going to decrypt.
-    let mut input_file = CipherFileReader::open(input_path)?;
+    let mut input_file = CipherTextReader::open_from_file(input_path)?;
 
     // Create a file to write the output into. It's the same as the input, but without a trailing ".arh" extension.
     let mut output_file_path = input_path.as_ref().to_owned();
@@ -367,7 +367,7 @@ pub fn decrypt_file_unchecked(
                 },
             )
     );
-    let mut output_file = PlainFileWriter::create_new(output_file_path)?;
+    let mut output_file = PlainTextWriter::create_new_file(output_file_path)?;
 
     // Compute the encryption key used by this file with the provided master key and salt value in this file's header.
     let mut derived_key = DerivedKeyData::re_derive_from(master_encryption_key, input_file.header().encryption_key_salt);
