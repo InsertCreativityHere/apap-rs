@@ -89,7 +89,7 @@ mod tests {
         let mut buffer = [ 0_u8; 40];
 
         let pre_result = read_to_buffer(&mut source, &mut buffer);
-        assert!(matches!(pre_result, ReadResult::Full));
+        debug_assert!(matches!(pre_result, ReadResult::Full));
 
         // ===== Act ===== //
         let result = read_to_buffer(&mut source, &mut buffer);
@@ -105,9 +105,9 @@ mod tests {
         let mut buffer = [ 0_u8; 18];
 
         let pre_result = read_to_buffer(&mut source, &mut buffer);
-        assert!(matches!(pre_result, ReadResult::Full));
+        debug_assert!(matches!(pre_result, ReadResult::Full));
         let pre_result = read_to_buffer(&mut source, &mut buffer);
-        assert!(matches!(pre_result, ReadResult::Eos(2)));
+        debug_assert!(matches!(pre_result, ReadResult::Eos(2)));
 
         // ===== Act ===== //
         let result = read_to_buffer(&mut source, &mut buffer);

@@ -18,7 +18,6 @@ pub fn generate_new_encryption_key() -> Key<Aes256> {
     rand::thread_rng().gen::<[u8; 32]>().into()
 }
 
-
 /// This struct is used to create and store derivative keys from a master key.
 /// It is only capable of handling and generating 256bit length keys.
 ///

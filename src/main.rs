@@ -4,11 +4,11 @@
 
 // So, we want 3 things:
 // 1) Take a file, and convert it to an ARH file                IMPLEMENTED
-// 2) Take an ARH file and convert it to a file
+// 2) Take an ARH file and convert it to a file                 IMPLEMENTED
 // 3) Be able to open and randomly access an ARH file
 
 // ===== TODO ===== //
-// Files that are still in progress: main, encryption, decryption, content_summarizer.
+// Files that are still in progress: main, encryption, decryption.
 // Add a license, README, cleanup the gitignore, and modify Cargo config file.
 // Add some kind of progress callback to the main functions, so they can report how many bytes they've processed.
 //
@@ -16,9 +16,6 @@
 // Add module comments to all the files.
 // Maybe we should test `ReadResult::Error`?
 // Should we be zeroing other things?
-
-// Should we be encrypting the length of the file?
-// That's the only thing we aren't encrypting that has the potential to be encrypted.
 
 // Instead of taking files, maybe the encryption/decryption should just take Readers/Writers so we can have in-memory tests.
 
