@@ -37,16 +37,13 @@
 
 pub mod constants;
 pub mod content_summarizer;
-pub mod decryption_io;
-pub mod encryption_io;
-pub mod io_utils;
+pub mod io;
 pub mod key_gen_utils;
 pub mod signature_utils;
 pub mod stream_cipher;
 
 use crate::content_summarizer::ContentSummarizer;
-use crate::decryption_io::{CipherTextReader, PlainTextWriter};
-use crate::encryption_io::{CipherTextWriter, PlainTextReader};
+use crate::io::{CipherTextReader, CipherTextWriter, PlainTextReader, PlainTextWriter, ReadResult};
 use crate::key_gen_utils::DerivedKeyData;
 use crate::stream_cipher::StreamCipher;
 use std::collections::HashSet;
@@ -55,7 +52,6 @@ use std::path::{Path, PathBuf};
 use aes::Aes256;
 use cipher::Key;
 use ed25519_dalek::{Keypair, PublicKey, Signature};
-use io_utils::ReadResult;
 use rand::Rng;
 use rayon::prelude::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use zeroize::Zeroize;

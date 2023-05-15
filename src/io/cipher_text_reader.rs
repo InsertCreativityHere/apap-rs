@@ -1,38 +1,10 @@
 
+use super::utils::{read_to_buffer, ReadResult};
 use crate::constants::*;
-use crate::io_utils::{read_to_buffer, ReadResult};
 use crate::Header;
 use std::fs::File;
-use std::io::{Error, ErrorKind, Read, Result, Seek, Write};
+use std::io::{Error, ErrorKind, Read, Result, Seek};
 use std::path::Path;
-
-pub struct PlainTextWriter<T: Write> {
-    output: T,
-}
-
-impl<T: Write> PlainTextWriter<T> {
-    pub fn new(output: T) -> Self {
-        Self { output }
-    }
-
-    pub fn write_content(&mut self, content: &[u8]) -> Result<()> {
-        self.output.write_all(content)
-    }
-}
-
-impl PlainTextWriter<File> {
-    pub fn create_new_file<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let file = File::create_new(path)?;
-        Ok(Self::new(file))
-    }
-}
-
-
-
-
-
-
-
 
 pub struct CipherTextReader<T: Read + Seek> {
     input: T,
