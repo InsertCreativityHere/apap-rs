@@ -63,7 +63,7 @@ impl DerivedKeyData {
 #[cfg(test)]
 mod tests {
     use super::DerivedKeyData;
-    use crate::key_gen_utils;
+    use super::super::key_gen_utils;
 
     #[test]
     fn ensure_key_derivation_is_deterministic() {

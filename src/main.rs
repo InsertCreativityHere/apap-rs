@@ -14,7 +14,6 @@
 //
 // See if using a ping-pong buffer for reading-processing input data improves performance.
 // Add module comments to all the files.
-// Maybe we should test `ReadResult::Error`?
 // Should we be zeroing other things?
 
 // TODO: go through everywhere we say 'file' and make sure it's abstracted correctly.
@@ -36,16 +35,11 @@
 // are basically the same thing, we can probably simplify them without losing performance.
 
 pub mod constants;
-pub mod content_summarizer;
+pub mod crypto;
 pub mod io;
-pub mod key_gen_utils;
-pub mod signature_utils;
-pub mod stream_cipher;
 
-use crate::content_summarizer::ContentSummarizer;
+use crate::crypto::{ContentSummarizer, DerivedKeyData, StreamCipher};
 use crate::io::{CipherTextReader, CipherTextWriter, PlainTextReader, PlainTextWriter, ReadResult};
-use crate::key_gen_utils::DerivedKeyData;
-use crate::stream_cipher::StreamCipher;
 use std::collections::HashSet;
 use std::io::{Error, ErrorKind, Result};
 use std::path::{Path, PathBuf};
@@ -128,7 +122,7 @@ pub fn verify_file(
     // TODO
     let signature = Signature::from_bytes(&input_file.header().signature)
         .map_err(|error| Error::new(ErrorKind::Other, error))?;
-    if !signature_utils::verify_signature(&signature, &public_signing_key, &hash_value) {
+    if !crypto::verify_signature(&signature, &public_signing_key, &hash_value) {
         return Err(Error::new(ErrorKind::Other, "File signature does not match contents! File has been altered or corrupted.")) // TODO better message
     }
 
@@ -222,7 +216,7 @@ pub fn encrypt_file(
 
     // Compute a hash for the file's contents and sign it with the provided key pair.
     let (hash_value, content_length) = summarizer.finalize(initial_value, key_salt);
-    let signed_hash_value = signature_utils::sign_message(&hash_value, signing_keys);
+    let signed_hash_value = crypto::sign_message(&hash_value, signing_keys);
 
     // Finalize the file by writing an ARH header and footer around the contents we've finished writing.
     let header = Header {
@@ -333,7 +327,7 @@ pub fn decrypt_file_checked(
     // TODO
     let signature = Signature::from_bytes(&input_file.header().signature)
         .map_err(|error| Error::new(ErrorKind::Other, error))?;
-    if !signature_utils::verify_signature(&signature, &public_signing_key, &hash_value) {
+    if !crypto::verify_signature(&signature, &public_signing_key, &hash_value) {
         return Err(Error::new(ErrorKind::Other, "File signature does not match contents! File has been altered or corrupted.")) // TODO better message
     }
 
@@ -421,8 +415,8 @@ pub fn decrypt_file_unchecked(
 
 
 fn main() {
-    let signing_keys = key_gen_utils::generate_new_signing_keys();
-    let master_encryption_key = key_gen_utils::generate_new_encryption_key();
+    let signing_keys = crypto::generate_new_signing_keys();
+    let master_encryption_key = crypto::generate_new_encryption_key();
     match encrypt_file("/Users/austin/archive-fs/test.txt", &master_encryption_key, &signing_keys) {
         Ok(_) => println!("Finished encrypting Successfully!"),
         Err(err) => {

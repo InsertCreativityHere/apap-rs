@@ -16,7 +16,7 @@ pub fn verify_signature(signature: &Signature, public_key: &PublicKey, expected:
 #[cfg(test)]
 mod tests {
     use super::{sign_message, verify_signature};
-    use crate::key_gen_utils;
+    use super::super::key_gen_utils;
     use ed25519_dalek::{Keypair, PublicKey, SecretKey};
     use rand::Rng;
 

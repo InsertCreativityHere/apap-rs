@@ -60,7 +60,7 @@ impl StreamCipher {
 #[cfg(test)]
 mod tests {
     use super::StreamCipher;
-    use crate::key_gen_utils;
+    use super::super::key_gen_utils;
     use rand::Rng;
     use rayon::prelude::*;
 
